@@ -5,7 +5,9 @@ import { useHotkeys } from '@mantine/hooks';
 // TODO: scoring
 
 // app globals
-const refreshRate = 5;  // ms
+const refreshRate = 20;  // ms
+const readRate = 20;   // ms
+const serverURL = "http://localhost:3001/";
 
 // motion parameters
 const PWIDTH = 20;
@@ -14,7 +16,8 @@ const BALL_DIAMETER = 50;
 const PLAYER_X = 10;
 const COMPUTER_X = 90;
 const MAX_PLAYER_SPEED = 5.0;
-const BALL_SPEED = 0.4 ;
+const SENSITIVITY = 10.0
+const BALL_SPEED = 1.2;
 
 // positions on screen
 const START = 45;
@@ -113,13 +116,23 @@ interface PlayerConfig {
   score: number
 }
 
+interface IMUData {
+  ax: number,
+  ay: number,
+  az: number,
+  gx: number,
+  gy: number,
+  gz: number,
+}
+
 function App() {
   const [player, changePlayer] = useState<PlayerConfig>({x: PLAYER_X, y: START, score: 0});
   const [computer, changeComputer] = useState<PlayerConfig>({x: COMPUTER_X, y: START, score: 0});
   const [ball, changeBall] = useState<BallProps>({x: 50, y: START, vx: -BALL_SPEED / 2, vy: 0});
-
-  // use space to control this
+  // controlled by space
   const [playing, setPlaying] = useState<boolean>(false);
+
+  const [_IMUData, setIMUData] = useState<IMUData>({ ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 });
 
   const updatePaddleY = function(y: number, amount: number): number {
     return Math.min(Math.max(y + amount, MIN), MAX)
@@ -141,6 +154,41 @@ function App() {
     }],
   ]);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetch(serverURL, {
+        method: "POST",
+        mode: "cors",
+        credentials: "same-origin",
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+        },
+      })
+        .then((res) => res.json())
+        .then((res) => {
+          setIMUData({
+            ax: res.ax,
+            ay: res.ay,
+            az: res.az,
+            gx: res.gx,
+            gy: res.gy,
+            gz: res.gz,
+          });
+
+          let ax: number | undefined = res.ax;
+          if (ax === undefined) {
+            return;
+          }
+          ax = -ax;
+          ax = Math.max(Math.min(ax * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+
+          changePlayer({...player, y: updatePaddleY(player.y, ax!)});
+        })
+        .catch((err) => console.log(err));
+    }, readRate);
+
+    return () => clearInterval(intervalId);
+  });
 
   /* Ball and computer paddle physics */
   useEffect(() => {
@@ -162,7 +210,7 @@ function App() {
           newBallY >= player.y - scalePxToPos(BALL_DIAMETER) && newBallY <= player.y + scalePxToPos(PHEIGHT)) {
         // hitting the player's paddle
         const center = player.y + scalePxToPos(PHEIGHT) / 2;
-        const diff = (ball.y - center) * diffScaler;
+        const diff = (newBallY  - center) * diffScaler;
         newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4)) + Math.random() * 0.25;
         if (diff <= 0) {
           newVy = -newVy;
@@ -173,9 +221,9 @@ function App() {
                  && newBallY >= computer.y - scalePxToPos(BALL_DIAMETER) && newBallY <= computer.y + scalePxToPos(PHEIGHT)) {
         // hitting the computer's paddle
         const center = computer.y + scalePxToPos(PHEIGHT) / 2;
-        const diff = (computer.y - center) * diffScaler;
+        const diff = (newBallY - center) * diffScaler;
         newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4)) + Math.random() * 0.25;
-        if (diff < 0) {
+        if (diff <= 0) {
           newVy = -newVy;
         }
 
@@ -200,8 +248,8 @@ function App() {
       }
 
       // physics for simple computer
-      const speedScaler = 0.5;
-      const diff = newBallY - computer.y;
+      const speedScaler = 1 ;
+      const diff = newBallY - computer.y - scalePxToPos(PHEIGHT) / 2;
       let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
       let newComputerY = updatePaddleY(computer.y, BALL_SPEED * direction * speedScaler);
   
