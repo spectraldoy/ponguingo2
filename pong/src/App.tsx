@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
+import { useHotkeys } from '@mantine/hooks';
 
 // app globals
 const refreshRate = 5;  // ms
@@ -82,7 +83,7 @@ interface PlayerConfig {
 }
 
 function App() {
-  const [player, changePlayer] = useState<PlayerConfig>({x: 10, y: START + 10, score: 0});
+  const [player, changePlayer] = useState<PlayerConfig>({x: 10, y: START, score: 0});
   const [computer, changeComputer] = useState<PlayerConfig>({x: 90, y: START, score: 0});
   const [ball, changeBall] = useState<BallProps>({x: 50, y: START, vx: BALL_SPEED, vy: BALL_SPEED});
 
@@ -97,51 +98,42 @@ function App() {
     return Math.min(Math.max(x + amount, 0.0), 100.0);
   }
 
-  /* mouse controls */
-  const movePlayerOnWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    let speed = Math.abs(e.deltaY);
-    speed = Math.min(Math.max(speed, 0.0), MAX_PLAYER_SPEED);
-    if (e.deltaY < 0) {
-      speed = -speed;
-    }
+  /* arrow controls */
+  useHotkeys([
+    ["ArrowUp", () => changePlayer({...player, y: updatePaddleY(player.y, -MAX_PLAYER_SPEED)})],
+    ["ArrowDown", () => changePlayer({...player, y: updatePaddleY(player.y, MAX_PLAYER_SPEED)})]
+  ]);
 
-    // moving down
-    console.log(e.deltaY, updatePaddleY(player.y, speed))
-    changePlayer({...player, y: updatePaddleY(player.y, speed)});
-  }
 
-  useEffect(() => {
-    document.addEventListener("wheel", movePlayerOnWheel);
-
-    return () => document.removeEventListener("wheel", movePlayerOnWheel);
-  }, []);
-  
-
-  /* Ball physics */
+  /* Ball and computer paddle physics */
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (!playing) {
         return;
       }
   
-      // physics
-      let newX = updateBetweenZeroAndHundred(ball.x, ball.vx);
-      let newY = updateBetweenZeroAndHundred(ball.y, ball.vy);
+      // physics for ball
+      let newBallX = updateBetweenZeroAndHundred(ball.x, ball.vx);
+      let newBallY = updateBetweenZeroAndHundred(ball.y, ball.vy);
       let newVx = ball.vx;
       let newVy = ball.vy;
   
       // 90-2 for the width of the paddle
-      if (newX < 10 || newX > 90 - 2) {
+      if (newBallX < 10 || newBallX > 90 - 2) {
         newVx = -newVx;
       }
   
-      if (newY <= 5 || newY >= 95) {
+      if (newBallY <= 5 || newBallY >= 95) {
         newVy = -newVy;
       }
+
+      // physics for simple computer
+      const diff = newBallY - computer.y;
+      let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
+      let newComputerY = updatePaddleY(computer.y, BALL_SPEED * direction);
   
-      changeBall({x: newX, y: newY, vx: newVx, vy: newVy});  
+      changeBall({x: newBallX, y: newBallY, vx: newVx, vy: newVy});
+      changeComputer({...computer, y: newComputerY})
     }, refreshRate);
 
     return () => clearInterval(intervalId);
