@@ -14,7 +14,7 @@ const BALL_DIAMETER = 50;
 const PLAYER_X = 10;
 const COMPUTER_X = 90;
 const MAX_PLAYER_SPEED = 5.0;
-const BALL_SPEED = 0.2;
+const BALL_SPEED = 0.4 ;
 
 // positions on screen
 const START = 45;
@@ -116,7 +116,7 @@ interface PlayerConfig {
 function App() {
   const [player, changePlayer] = useState<PlayerConfig>({x: PLAYER_X, y: START, score: 0});
   const [computer, changeComputer] = useState<PlayerConfig>({x: COMPUTER_X, y: START, score: 0});
-  const [ball, changeBall] = useState<BallProps>({x: 50, y: START, vx: -BALL_SPEED, vy: 0});
+  const [ball, changeBall] = useState<BallProps>({x: 50, y: START, vx: -BALL_SPEED / 2, vy: 0});
 
   // use space to control this
   const [playing, setPlaying] = useState<boolean>(false);
@@ -136,7 +136,7 @@ function App() {
     ["space", () => {
       if (!playing) {
         setPlaying(true);
-        changeBall({x: 50, y: START, vx: -BALL_SPEED, vy: 0});
+        changeBall({x: 50, y: START, vx: -BALL_SPEED / 2, vy: 0});
       }
     }],
   ]);
@@ -163,18 +163,18 @@ function App() {
         // hitting the player's paddle
         const center = player.y + scalePxToPos(PHEIGHT) / 2;
         const diff = (ball.y - center) * diffScaler;
-        newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4));
-        if (diff < 0) {
+        newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4)) + Math.random() * 0.25;
+        if (diff <= 0) {
           newVy = -newVy;
         }
 
         newVx = BALL_SPEED;
-      } else if (newBallX + scalePxToPos(BALL_DIAMETER) / 2 >= COMPUTER_X
+      } else if (newBallX + scalePxToPos(BALL_DIAMETER) / 2 >= COMPUTER_X && newBallX + scalePxToPos(BALL_DIAMETER) / 2 <= COMPUTER_X + scalePxToPos(PWIDTH)
                  && newBallY >= computer.y - scalePxToPos(BALL_DIAMETER) && newBallY <= computer.y + scalePxToPos(PHEIGHT)) {
         // hitting the computer's paddle
         const center = computer.y + scalePxToPos(PHEIGHT) / 2;
         const diff = (computer.y - center) * diffScaler;
-        newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4));
+        newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4)) + Math.random() * 0.25;
         if (diff < 0) {
           newVy = -newVy;
         }
@@ -194,13 +194,13 @@ function App() {
         return;
       }
   
-      // bounding off the wall
-      if (newBallY <= scalePxToPos(BALL_DIAMETER) || newBallY >= 100 - scalePxToPos(BALL_DIAMETER)) {
+      // bouncing off the wall
+      if (newBallY <= scalePxToPos(BALL_DIAMETER) / 2 || newBallY >= 100 - scalePxToPos(BALL_DIAMETER) / 2) {
         newVy = -newVy;
       }
 
       // physics for simple computer
-      const speedScaler = 0.1;
+      const speedScaler = 0.5;
       const diff = newBallY - computer.y;
       let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
       let newComputerY = updatePaddleY(computer.y, BALL_SPEED * direction * speedScaler);
