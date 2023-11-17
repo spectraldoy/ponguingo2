@@ -6,7 +6,6 @@ import { useHotkeys } from '@mantine/hooks';
 
 // app globals
 const refreshRate = 20;  // ms
-const readRate = 20;   // ms
 const serverURL = "http://localhost:3001/";
 
 // motion parameters
@@ -15,9 +14,9 @@ const PHEIGHT = 150;
 const BALL_DIAMETER = 50;
 const PLAYER_X = 10;
 const COMPUTER_X = 90;
-const MAX_PLAYER_SPEED = 5.0;
-const SENSITIVITY = 10.0
-const BALL_SPEED = 1.2;
+const MAX_PLAYER_SPEED = 10.0;
+const SENSITIVITY = 2.5 ;
+const BALL_SPEED = 1.5;
 
 // positions on screen
 const START = 45;
@@ -154,45 +153,9 @@ function App() {
     }],
   ]);
 
+  /* Ball, player and computer paddle physics */
   useEffect(() => {
-    const intervalId = setInterval(() => {
-      fetch(serverURL, {
-        method: "POST",
-        mode: "cors",
-        credentials: "same-origin",
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
-      })
-        .then((res) => res.json())
-        .then((res) => {
-          setIMUData({
-            ax: res.ax,
-            ay: res.ay,
-            az: res.az,
-            gx: res.gx,
-            gy: res.gy,
-            gz: res.gz,
-          });
-
-          let ax: number | undefined = res.ax;
-          if (ax === undefined) {
-            return;
-          }
-          ax = -ax;
-          ax = Math.max(Math.min(ax * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-
-          changePlayer({...player, y: updatePaddleY(player.y, ax!)});
-        })
-        .catch((err) => console.log(err));
-    }, readRate);
-
-    return () => clearInterval(intervalId);
-  });
-
-  /* Ball and computer paddle physics */
-  useEffect(() => {
-    const intervalId = setInterval(() => {
+    const intervalId = setInterval(async () => {
       if (!playing) {
         return;
       }
@@ -206,7 +169,7 @@ function App() {
       // simulate bouncing off a paddle
       // 2 is the width of the paddle, 15 is the height of the paddle
       const diffScaler = 3;
-      if (newBallX >= PLAYER_X - scalePxToPos(PWIDTH)  && newBallX <= PLAYER_X && 
+      if (newBallX >= PLAYER_X  && newBallX <= PLAYER_X + scalePxToPos(PWIDTH) && 
           newBallY >= player.y - scalePxToPos(BALL_DIAMETER) && newBallY <= player.y + scalePxToPos(PHEIGHT)) {
         // hitting the player's paddle
         const center = player.y + scalePxToPos(PHEIGHT) / 2;
@@ -247,14 +210,34 @@ function App() {
         newVy = -newVy;
       }
 
+      // update player
+      const data = await fetch(serverURL, {
+        method: "POST",
+        mode: "cors",
+        credentials: "same-origin",
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+      const res: IMUData = await data.json();
+      setIMUData(res);
+      let ax: number | undefined = res.ax;
+      if (ax === undefined) {
+        return;
+      }
+      ax = -ax;
+      ax = Math.max(Math.min(ax * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+      let newPlayerY = updatePaddleY(player.y, ax);
+
       // physics for simple computer
-      const speedScaler = 1 ;
+      const speedScaler = 0.5;
       const diff = newBallY - computer.y - scalePxToPos(PHEIGHT) / 2;
       let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
       let newComputerY = updatePaddleY(computer.y, BALL_SPEED * direction * speedScaler);
   
       changeBall({x: newBallX, y: newBallY, vx: newVx, vy: newVy});
       changeComputer({...computer, y: newComputerY})
+      changePlayer({...player, y: newPlayerY});
     }, refreshRate);
 
     return () => clearInterval(intervalId);
