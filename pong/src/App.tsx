@@ -15,7 +15,7 @@ const BALL_DIAMETER = 50;
 const PLAYER_X = 10;
 const COMPUTER_X = 90;
 const MAX_PLAYER_SPEED = 10.0;
-const SENSITIVITY = 2.5 ;
+const SENSITIVITY = 0.02;
 const BALL_SPEED = 1.5;
 
 // positions on screen
@@ -221,16 +221,16 @@ function App() {
       });
       const res: IMUData = await data.json();
       setIMUData(res);
-      let ax: number | undefined = res.ax;
-      if (ax === undefined) {
+      let gy: number | undefined = res.gy;
+      if (gy === undefined) {
         return;
       }
-      ax = -ax;
-      ax = Math.max(Math.min(ax * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-      let newPlayerY = updatePaddleY(player.y, ax);
+      gy = -gy;
+      gy = Math.max(Math.min(gy * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+      let newPlayerY = updatePaddleY(player.y, gy);
 
       // physics for simple computer
-      const speedScaler = 0.5;
+      const speedScaler = 0.7;
       const diff = newBallY - computer.y - scalePxToPos(PHEIGHT) / 2;
       let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
       let newComputerY = updatePaddleY(computer.y, BALL_SPEED * direction * speedScaler);
