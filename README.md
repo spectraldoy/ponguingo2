@@ -1,3 +1,3 @@
-# Pong with an Arduino
+# Two-player Pong with Arduinos
 
-Made for Arduino Nano 33 IoT. Done as a project for UCLA's CS M119.
+Made for two Arduino Nano 33 IoTs. Done as a project for UCLA's CS M119.
