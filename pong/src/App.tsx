@@ -2,18 +2,17 @@ import { useEffect, useState } from 'react';
 import './App.css';
 import { useHotkeys } from '@mantine/hooks';
 
-// TODO: scoring
-
 // app globals
 const refreshRate = 20;  // ms
-const serverURL = "http://localhost:3001/";
+const playerOneDataURL = "http://localhost:3001/playerOne";
+const playerTwoDataURL = "http://localhost:3001/playerTwo";
 
 // motion parameters
 const PWIDTH = 20;
 const PHEIGHT = 150;
 const BALL_DIAMETER = 50;
-const PLAYER_X = 10;
-const COMPUTER_X = 90;
+const PLAYER_ONE_X = 10;
+const PLAYER_TWO_X = 90;
 const MAX_PLAYER_SPEED = 10.0;
 const SENSITIVITY = 0.02;
 const BALL_SPEED = 1.5;
@@ -36,7 +35,7 @@ interface ScoreProps {
   // score
   score: number,
   // displacement from left
-  left: number | string,
+  readonly left: number | string,
 }
 
 function Score(props: ScoreProps) {
@@ -125,11 +124,14 @@ interface IMUData {
 }
 
 function App() {
-  const [player, changePlayer] = useState<PlayerConfig>({x: PLAYER_X, y: START, score: 0});
-  const [computer, changeComputer] = useState<PlayerConfig>({x: COMPUTER_X, y: START, score: 0});
+  const [playerOne, changePlayerOne] = useState<PlayerConfig>({x: PLAYER_ONE_X, y: START, score: 0});
+  const [playerTwo, changePlayerTwo] = useState<PlayerConfig>({x: PLAYER_TWO_X, y: START, score: 0});
   const [ball, changeBall] = useState<BallProps>({x: 50, y: START, vx: -BALL_SPEED / 2, vy: 0});
   // controlled by space
   const [playing, setPlaying] = useState<boolean>(false);
+  // two player or computer
+  type Opponent = "computer" | "human";
+  const [opponent, setOpponent] = useState<Opponent>("human");
 
   const [_IMUData, setIMUData] = useState<IMUData>({ ax: 0, ay: 0, az: 0, gx: 0, gy: 0, gz: 0 });
 
@@ -143,8 +145,10 @@ function App() {
 
   /* arrow controls */
   useHotkeys([
-    ["ArrowUp", () => changePlayer({...player, y: updatePaddleY(player.y, -MAX_PLAYER_SPEED)})],
-    ["ArrowDown", () => changePlayer({...player, y: updatePaddleY(player.y, MAX_PLAYER_SPEED)})],
+    ["ArrowUp", () => changePlayerOne({...playerOne, y: updatePaddleY(playerOne.y, -MAX_PLAYER_SPEED)})],
+    ["ArrowDown", () => changePlayerOne({...playerOne, y: updatePaddleY(playerOne.y, MAX_PLAYER_SPEED)})],
+    ["W", () => changePlayerTwo({...playerTwo, y: updatePaddleY(playerTwo.y, -MAX_PLAYER_SPEED)})],
+    ["S", () => changePlayerTwo({...playerTwo, y: updatePaddleY(playerTwo.y, MAX_PLAYER_SPEED)})],
     ["space", () => {
       if (!playing) {
         setPlaying(true);
@@ -169,10 +173,10 @@ function App() {
       // simulate bouncing off a paddle
       // 2 is the width of the paddle, 15 is the height of the paddle
       const diffScaler = 3;
-      if (newBallX >= PLAYER_X  && newBallX <= PLAYER_X + scalePxToPos(PWIDTH) && 
-          newBallY >= player.y - scalePxToPos(BALL_DIAMETER) && newBallY <= player.y + scalePxToPos(PHEIGHT)) {
+      if (newBallX >= PLAYER_ONE_X  && newBallX <= PLAYER_ONE_X + scalePxToPos(PWIDTH) && 
+          newBallY >= playerOne.y - scalePxToPos(BALL_DIAMETER) && newBallY <= playerOne.y + scalePxToPos(PHEIGHT)) {
         // hitting the player's paddle
-        const center = player.y + scalePxToPos(PHEIGHT) / 2;
+        const center = playerOne.y + scalePxToPos(PHEIGHT) / 2;
         const diff = (newBallY  - center) * diffScaler;
         newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4)) + Math.random() * 0.25;
         if (diff <= 0) {
@@ -180,10 +184,10 @@ function App() {
         }
 
         newVx = BALL_SPEED;
-      } else if (newBallX + scalePxToPos(BALL_DIAMETER) / 2 >= COMPUTER_X && newBallX + scalePxToPos(BALL_DIAMETER) / 2 <= COMPUTER_X + scalePxToPos(PWIDTH)
-                 && newBallY >= computer.y - scalePxToPos(BALL_DIAMETER) && newBallY <= computer.y + scalePxToPos(PHEIGHT)) {
+      } else if (newBallX + scalePxToPos(BALL_DIAMETER) / 2 >= PLAYER_TWO_X && newBallX + scalePxToPos(BALL_DIAMETER) / 2 <= PLAYER_TWO_X + scalePxToPos(PWIDTH)
+                 && newBallY >= playerTwo.y - scalePxToPos(BALL_DIAMETER) && newBallY <= playerTwo.y + scalePxToPos(PHEIGHT)) {
         // hitting the computer's paddle
-        const center = computer.y + scalePxToPos(PHEIGHT) / 2;
+        const center = playerTwo.y + scalePxToPos(PHEIGHT) / 2;
         const diff = (newBallY - center) * diffScaler;
         newVy = BALL_SPEED * Math.min(Math.abs(diff) / scalePxToPos(PHEIGHT), Math.sin(Math.PI / 4)) + Math.random() * 0.25;
         if (diff <= 0) {
@@ -197,11 +201,11 @@ function App() {
       if (newBallX <= 0) {
         // increase computer's score
         setPlaying(false);
-        changeComputer({...computer, score: computer.score + 1});
+        changePlayerTwo({...playerTwo, score: playerTwo.score + 1});
         return;
       } else if (newBallX >= 100 - scalePxToPos(BALL_DIAMETER) / 2) {
         setPlaying(false);
-        changePlayer({...player, score: player.score + 1});
+        changePlayerOne({...playerOne, score: playerOne.score + 1});
         return;
       }
   
@@ -211,7 +215,7 @@ function App() {
       }
 
       // update player
-      const data = await fetch(serverURL, {
+      const data = await fetch(playerOneDataURL, {
         method: "POST",
         mode: "cors",
         credentials: "same-origin",
@@ -221,23 +225,47 @@ function App() {
       });
       const res: IMUData = await data.json();
       setIMUData(res);
+
+      // TODO: Up / down / stop gestures
       let gy: number | undefined = res.gy;
       if (gy === undefined) {
         return;
       }
       gy = -gy;
       gy = Math.max(Math.min(gy * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-      let newPlayerY = updatePaddleY(player.y, gy);
+      let newPlayerOneY = updatePaddleY(playerOne.y, gy);
 
       // physics for simple computer
-      const speedScaler = 0.7;
-      const diff = newBallY - computer.y - scalePxToPos(PHEIGHT) / 2;
-      let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
-      let newComputerY = updatePaddleY(computer.y, BALL_SPEED * direction * speedScaler);
+      let newPlayerTwoY;
+      if (opponent === "computer") {
+        const speedScaler = 0.7;
+        const diff = newBallY - playerTwo.y - scalePxToPos(PHEIGHT) / 2;
+        let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
+        newPlayerTwoY = updatePaddleY(playerTwo.y, BALL_SPEED * direction * speedScaler);
+      } else {
+        const data = await fetch(playerTwoDataURL, {
+          method: "POST",
+          mode: "cors",
+          credentials: "same-origin",
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+        const res: IMUData = await data.json();
+        setIMUData(res);
   
+        // TODO: Up / down / stop gestures
+        let gy: number | undefined = res.gy;
+        if (gy === undefined) {
+          return;
+        }
+        gy = -gy;
+        gy = Math.max(Math.min(gy * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+        newPlayerTwoY = updatePaddleY(playerOne.y, gy);
+      }
       changeBall({x: newBallX, y: newBallY, vx: newVx, vy: newVy});
-      changeComputer({...computer, y: newComputerY})
-      changePlayer({...player, y: newPlayerY});
+      changePlayerOne({...playerOne, y: newPlayerOneY});
+      changePlayerTwo({...playerTwo, y: newPlayerTwoY});
     }, refreshRate);
 
     return () => clearInterval(intervalId);
@@ -250,10 +278,10 @@ function App() {
       display: "block",
       background: "#000000",
     }}>
-      <Score key="playerscore" score={player.score} left="20vw"/>
-      <Score key="computerscore" score={computer.score} left="80vw"/>
-      <Paddle key="player" x={player.x} y={player.y} />
-      <Paddle key="computer" x={computer.x} y={computer.y} />
+      <Score key="player1score" score={playerOne.score} left="20vw"/>
+      <Score key="player2score" score={playerTwo.score} left="80vw"/>
+      <Paddle key="playerOne" x={playerOne.x} y={playerOne.y} />
+      <Paddle key="playerTwo" x={playerTwo.x} y={playerTwo.y} />
       <Ball key="ball" {...ball} />
     </div>
   );
