@@ -13,8 +13,8 @@ const PHEIGHT = 150;
 const BALL_DIAMETER = 50;
 const PLAYER_ONE_X = 10;
 const PLAYER_TWO_X = 90;
-const MAX_PLAYER_SPEED = 10.0;
-const SENSITIVITY = 3;
+const MAX_PLAYER_SPEED = 4.0;
+const SENSITIVITY = 0.02;
 const BALL_SPEED = 1.5;
 
 // positions on screen
@@ -111,7 +111,9 @@ interface PlayerConfig {
   // y between essentially 0 and 100, translated to 0% to 100% of screen
   y: number,
   // current score: non-negative int
-  score: number
+  score: number,
+  // approximate amount of time in one direction
+  directionDuration: number
 }
 
 interface IMUData {
@@ -124,8 +126,8 @@ interface IMUData {
 }
 
 function App() {
-  const [playerOne, changePlayerOne] = useState<PlayerConfig>({x: PLAYER_ONE_X, y: START, score: 0});
-  const [playerTwo, changePlayerTwo] = useState<PlayerConfig>({x: PLAYER_TWO_X, y: START, score: 0});
+  const [playerOne, changePlayerOne] = useState<PlayerConfig>({x: PLAYER_ONE_X, y: START, score: 0, directionDuration: 0});
+  const [playerTwo, changePlayerTwo] = useState<PlayerConfig>({x: PLAYER_TWO_X, y: START, score: 0, directionDuration: 0});
   const [ball, changeBall] = useState<BallProps>({x: 50, y: START, vx: -BALL_SPEED / 2, vy: 0});
   // controlled by space
   const [playing, setPlaying] = useState<boolean>(false);
@@ -156,6 +158,26 @@ function App() {
       }
     }],
   ]);
+
+  const newPaddleYGivenIMUData = (imuData: IMUData, initialY: number, directionDuration: number): { newY: number, newDirectionDuration: number } => {
+      // TODO: Up / down / stop gestures
+      let ay: number | undefined = imuData.ay;
+      if (ay === undefined || imuData.az > 0.8) {
+        return { newY: initialY, newDirectionDuration: directionDuration };
+      }
+
+      let sign = Math.sign(ay);
+      if (sign == Math.sign(directionDuration)) {
+        directionDuration += sign * refreshRate / 2;
+      } else {
+        directionDuration = sign;
+      }
+
+      let displ =
+        Math.max(Math.min(directionDuration * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+
+      return { newY: updatePaddleY(initialY, displ), newDirectionDuration: directionDuration };
+  }
 
   /* Ball, player and computer paddle physics */
   useEffect(() => {
@@ -225,18 +247,13 @@ function App() {
       });
       const res: IMUData = await data.json();
       // setIMUData(res);
-
-      // TODO: Up / down / stop gestures
-      let ay: number | undefined = res.ay;
-      if (ay === undefined) {
-        return;
-      }
-      ay = -ay;
-      ay = Math.max(Math.min(ay * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-      let newPlayerOneY = updatePaddleY(playerOne.y, ay);
+      const updates = newPaddleYGivenIMUData(res, playerOne.y, playerOne.directionDuration);
+      let newPlayerOneY = updates.newY;
+      let newPlayerOneDirectionDuration = updates.newDirectionDuration;
 
       // physics for simple computer
       let newPlayerTwoY = playerTwo.y;
+      let newPlayerTwoDirectionDuration = playerTwo.directionDuration;
       if (opponent === "computer") {
         const speedScaler = 0.7;
         const diff = newBallY - playerTwo.y - scalePxToPos(PHEIGHT) / 2;
@@ -252,20 +269,13 @@ function App() {
           },
         });
         const res: IMUData = await data.json();
-        // setIMUData(res);
-  
-        // TODO: Up / down / stop gestures
-        let ay: number | undefined = res.ay;
-        if (ay === undefined) {
-          return;
-        }
-        ay = -ay;
-        ay = Math.max(Math.min(ay * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-        newPlayerTwoY = updatePaddleY(playerTwo.y, ay);
+        const updates = newPaddleYGivenIMUData(res, playerTwo.y, playerTwo.directionDuration);
+        newPlayerTwoY = updates.newY;
+        newPlayerTwoDirectionDuration = updates.newDirectionDuration;
       }
       changeBall({x: newBallX, y: newBallY, vx: newVx, vy: newVy});
-      changePlayerOne({...playerOne, y: newPlayerOneY});
-      changePlayerTwo({...playerTwo, y: newPlayerTwoY});
+      changePlayerOne({...playerOne, y: newPlayerOneY, directionDuration: newPlayerOneDirectionDuration});
+      changePlayerTwo({...playerTwo, y: newPlayerTwoY, directionDuration: newPlayerTwoDirectionDuration});
     }, refreshRate);
 
     return () => clearInterval(intervalId);
