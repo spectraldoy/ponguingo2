@@ -15,8 +15,8 @@
 #define BLE_UUID_GYROSCOPE_Y "3102"
 #define BLE_UUID_GYROSCOPE_Z "3103"
 
-#define BLE_DEVICE_NAME "AG Nano 33 IoT"
-#define BLE_LOCAL_NAME "AG Nano 33 IoT"
+#define BLE_DEVICE_NAME "Nano 33 IoT 1"
+#define BLE_LOCAL_NAME "Nano 33 IoT 1"
 
 BLEService IMUService(BLE_UUID_IMU_SERVICE);
 
@@ -56,7 +56,7 @@ void setup() {
 
   // initialize Serial
   Serial.begin(9600);
-  while (!Serial);
+  // while (!Serial);
 
   // initialize IMU
   if (!IMU.begin()) {

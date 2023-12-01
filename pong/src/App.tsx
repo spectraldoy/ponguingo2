@@ -14,7 +14,7 @@ const BALL_DIAMETER = 50;
 const PLAYER_ONE_X = 10;
 const PLAYER_TWO_X = 90;
 const MAX_PLAYER_SPEED = 10.0;
-const SENSITIVITY = 0.02;
+const SENSITIVITY = 3;
 const BALL_SPEED = 1.5;
 
 // positions on screen
@@ -215,25 +215,25 @@ function App() {
       }
 
       // update player
-      // const data = await fetch(playerOneDataURL, {
-      //   method: "POST",
-      //   mode: "cors",
-      //   credentials: "same-origin",
-      //   headers: {
-      //     "Access-Control-Allow-Origin": "*",
-      //   },
-      // });
-      // const res: IMUData = await data.json();
+      const data = await fetch(playerOneDataURL, {
+        method: "POST",
+        mode: "cors",
+        credentials: "same-origin",
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
+      const res: IMUData = await data.json();
       // setIMUData(res);
 
-      // // TODO: Up / down / stop gestures
-      // let gy: number | undefined = res.gy;
-      // if (gy === undefined) {
-      //   return;
-      // }
-      // gy = -gy;
-      // gy = Math.max(Math.min(gy * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-      let newPlayerOneY = playerOne.y;// updatePaddleY(playerOne.y, gy);
+      // TODO: Up / down / stop gestures
+      let ay: number | undefined = res.ay;
+      if (ay === undefined) {
+        return;
+      }
+      ay = -ay;
+      ay = Math.max(Math.min(ay * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+      let newPlayerOneY = updatePaddleY(playerOne.y, ay);
 
       // physics for simple computer
       let newPlayerTwoY = playerTwo.y;
@@ -243,25 +243,25 @@ function App() {
         let direction = (diff === 0) ? 0 : diff / Math.abs(diff);
         newPlayerTwoY = updatePaddleY(playerTwo.y, BALL_SPEED * direction * speedScaler);
       } else {
-        // const data = await fetch(playerTwoDataURL, {
-        //   method: "POST",
-        //   mode: "cors",
-        //   credentials: "same-origin",
-        //   headers: {
-        //     "Access-Control-Allow-Origin": "*",
-        //   },
-        // });
-        // const res: IMUData = await data.json();
+        const data = await fetch(playerTwoDataURL, {
+          method: "POST",
+          mode: "cors",
+          credentials: "same-origin",
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+          },
+        });
+        const res: IMUData = await data.json();
         // setIMUData(res);
   
-        // // TODO: Up / down / stop gestures
-        // let gy: number | undefined = res.gy;
-        // if (gy === undefined) {
-        //   return;
-        // }
-        // gy = -gy;
-        // gy = Math.max(Math.min(gy * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
-        // newPlayerTwoY = updatePaddleY(playerOne.y, gy);
+        // TODO: Up / down / stop gestures
+        let ay: number | undefined = res.ay;
+        if (ay === undefined) {
+          return;
+        }
+        ay = -ay;
+        ay = Math.max(Math.min(ay * SENSITIVITY, MAX_PLAYER_SPEED), -MAX_PLAYER_SPEED);
+        newPlayerTwoY = updatePaddleY(playerTwo.y, ay);
       }
       changeBall({x: newBallX, y: newBallY, vx: newVx, vy: newVy});
       changePlayerOne({...playerOne, y: newPlayerOneY});
